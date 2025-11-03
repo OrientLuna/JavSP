@@ -223,6 +223,12 @@ class Translator(BaseConfig):
     engine: TranslateEngine = Field(..., discriminator='name')
     fields: TranslateField
 
+class General(BaseConfig):
+    cache_file: str = "data/scan_cache.json"
+    enable_incremental_scan: bool = True
+    cache_cleanup_interval: int = 30  # days
+    enable_gui: bool = False  # 是否启用GUI模式
+
 class Other(BaseConfig):
     interactive: bool
     check_update: bool
@@ -246,5 +252,6 @@ class Cfg(BaseConfig):
     crawler: Crawler
     summarizer: Summarizer
     translator: Translator
+    general: General
     other: Other
     CONFIG_SOURCES=get_config_source()

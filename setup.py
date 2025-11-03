@@ -23,8 +23,25 @@ for file in os.listdir('javsp/web'):
     if ext == '.py':
         includes.append('javsp.web.' + name)
 
-packages = [ 
-    'pendulum' # pydantic_extra_types depends on pendulum
+packages = [
+    'pendulum',  # pydantic_extra_types depends on pendulum
+    'requests',
+    'colorama',
+    'pathlib',
+    'json',
+    'hashlib',
+    'logging',
+    'threading',
+    'concurrent.futures',
+    'urllib.parse',
+    'argparse',
+    'datetime',
+    're',
+    'shutil',
+    'os',
+    'sys',
+    'time',
+    'itertools'
 ]
 
 # 平台特定的构建配置
@@ -32,27 +49,32 @@ if platform.system() == 'Darwin':  # macOS
     build_exe = {
         'include_files': include_files,
         'includes': includes,
-        'excludes': ['unittest', 'test'],
+        'excludes': ['unittest', 'test', 'pytest', 'tkinter.test'],
         'packages': packages,
         'zip_include_packages': ['*'],
         'zip_exclude_packages': [],
         'include_msvcr': True,
         'silent': True,
+        'optimize': 2,
+        'zip_include_packages': ['*'],
+        'replace_paths': [('*', 'javsp')],
     }
 elif platform.system() == 'Windows':
     build_exe = {
         'include_files': include_files,
         'includes': includes,
-        'excludes': ['unittest'],
+        'excludes': ['unittest', 'test', 'pytest'],
         'packages': packages,
         'include_msvcr': True,
+        'optimize': 2,
     }
 else:  # Linux
     build_exe = {
         'include_files': include_files,
         'includes': includes,
-        'excludes': ['unittest'],
+        'excludes': ['unittest', 'test', 'pytest'],
         'packages': packages,
+        'optimize': 2,
     }
 
 # 根据平台选择可执行文件配置
@@ -83,7 +105,34 @@ else:  # Linux
 
 setup(
     name='JavSP',
-    options = {'build_exe': build_exe}, 
-    executables=[javsp]
+    version='2.8.0',
+    description='汇总多站点数据的AV元数据刮削器',
+    author='Yuukiy',
+    author_email='yuukisil@outlook.com',
+    url='https://github.com/Yuukiy/JavSP',
+    license='GPL-3.0',
+    options={'build_exe': build_exe},
+    executables=[javsp],
+    python_requires='>=3.8',
+    install_requires=[
+        'pydantic>=2.0.0',
+        'confz>=2.0.0',
+        'requests>=2.28.0',
+        'colorama>=0.4.0',
+        'tqdm>=4.64.0',
+        'Pillow>=9.0.0',
+        'pydantic-extra-types>=2.0.0',
+        'pendulum>=2.1.0',
+        'cloudscraper>=1.2.0',
+        'cx-Logging>=3.0.0',
+        'lxml>=4.9.0',
+        'beautifulsoup4>=4.11.0',
+        'pretty_errors>=1.2.0',
+    ],
+    entry_points={
+        'console_scripts': [
+            'javsp=javsp.__main__:entry',
+        ],
+    },
 )
 

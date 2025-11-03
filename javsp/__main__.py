@@ -48,6 +48,7 @@ from javsp.web.translate import translate_movie_info
 
 from javsp.config import Cfg, CrawlerID, OperationMode
 from javsp.prompt import prompt
+from javsp.scan_cache import get_cache, save_cache
 
 actressAliasMap = {}
 
@@ -503,10 +504,30 @@ def RunOrganizeOnlyMode(all_movies):
             if Cfg().summarizer.move_files:
                 inner_bar.set_description('移动影片文件')
                 movie.rename_files()
+                # 标记文件为已处理
+                if Cfg().general.enable_incremental_scan:
+                    try:
+                        cache = get_cache()
+                        movie_id = movie.dvdid if hasattr(movie, 'dvdid') and movie.dvdid else movie.cid
+                        if movie_id:
+                            for file_path in movie.files:
+                                cache.mark_file_processed(file_path, movie_id)
+                    except Exception as e:
+                        logger.warning(f"无法更新缓存: {e}")
                 check_step(True)
                 logger.info(f'整理完成，相关文件已保存到: {movie.save_dir}\n')
             else:
                 logger.info(f'文件未移动，保持原位置\n')
+                # 即使不移动文件，也要标记为已处理
+                if Cfg().general.enable_incremental_scan:
+                    try:
+                        cache = get_cache()
+                        movie_id = movie.dvdid if hasattr(movie, 'dvdid') and movie.dvdid else movie.cid
+                        if movie_id:
+                            for file_path in movie.files:
+                                cache.mark_file_processed(file_path, movie_id)
+                    except Exception as e:
+                        logger.warning(f"无法更新缓存: {e}")
 
             return_movies.append(movie)
         except Exception as e:
@@ -717,7 +738,20 @@ def error_exit(success, err_info):
 
 def entry():
     try:
-        Cfg()
+        cfg = Cfg()
+
+        # 检查是否启用GUI模式
+        if hasattr(cfg, 'general') and hasattr(cfg.general, 'enable_gui') and cfg.general.enable_gui:
+            try:
+                from javsp.gui.app import JavSPApp
+                app = JavSPApp()
+                app.run()
+                return
+            except ImportError as e:
+                print(f"GUI模块不可用，回退到命令行模式: {e}")
+            except Exception as e:
+                print(f"启动GUI失败，回退到命令行模式: {e}")
+
     except ValidationError as e:
         print(e.errors())
         exit(1)
@@ -757,6 +791,14 @@ def entry():
         RunOrganizeOnlyMode(recognized + recognize_fail)
     else:
         RunNormalMode(recognized + recognize_fail)
+
+    # 保存缓存
+    if Cfg().general.enable_incremental_scan:
+        try:
+            save_cache()
+            logger.info("扫描缓存已保存")
+        except Exception as e:
+            logger.warning(f"保存缓存失败: {e}")
 
     sys.exit(0)
 

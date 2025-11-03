@@ -22,16 +22,27 @@ logger = logging.getLogger(__name__)
 failed_items = []
 
 
-def scan_movies(root: str) -> List[Movie]:
+def scan_movies(root: str, force_rescan: bool = False) -> List[Movie]:
     """获取文件夹内的所有影片的列表（自动探测同一文件夹内的分片）"""
-    # 由于实现的限制: 
+    # 由于实现的限制:
     # 1. 以数字编号最多支持10个分片，字母编号最多支持26个分片
     # 2. 允许分片间的编号有公共的前导符（如编号01, 02, 03），因为求prefix时前导符也会算进去
+
+    # 初始化扫描缓存
+    cache = None
+    if Cfg().general.enable_incremental_scan and not force_rescan:
+        try:
+            from javsp.scan_cache import get_cache
+            cache = get_cache()
+            logger.info("启用增量扫描模式")
+        except Exception as e:
+            logger.warning(f"无法启用增量扫描: {e}")
 
     # 扫描所有影片文件并获取它们的番号
     dic = {}    # avid: [abspath1, abspath2...]
     small_videos = {}
     ignore_folder_name_pattern = re.compile('|'.join(Cfg().scanner.ignored_folder_name_pattern))
+    processed_count = 0
     for dirpath, dirnames, filenames in os.walk(root):
         for name in dirnames.copy():
             if ignore_folder_name_pattern.match(name):
@@ -51,6 +62,17 @@ def scan_movies(root: str) -> List[Movie]:
                 if filesize < Cfg().scanner.minimum_size:
                     small_videos.setdefault(file, []).append(fullpath)
                     continue
+
+                # 检查缓存（仅在增量扫描模式下）
+                if cache:
+                    dvdid = get_id(fullpath)
+                    cid = get_cid(fullpath)
+                    avid = cid if cid else dvdid
+
+                    if avid and cache.is_file_processed(fullpath, avid):
+                        processed_count += 1
+                        continue
+
                 dvdid = get_id(fullpath)
                 cid = get_cid(fullpath)
                 # 如果文件名能匹配到cid，那么将cid视为有效id，因为此时dvdid多半是错的
@@ -152,6 +174,11 @@ def scan_movies(root: str) -> List[Movie]:
         mov.data_src = src
         logger.debug(f'影片数据源类型: {avid}: {src}')
         movies.append(mov)
+
+    # 记录增量扫描结果
+    if cache and processed_count > 0:
+        logger.info(f"增量扫描: 跳过 {processed_count} 个已处理的文件")
+
     return movies
 
 

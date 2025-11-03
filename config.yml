@@ -195,6 +195,17 @@ translator:
     plot: true
   
 ################################
+general:
+  # 缓存文件路径（相对于程序运行目录）
+  cache_file: "data/scan_cache.json"
+  # 启用增量扫描（跳过已处理的文件）
+  enable_incremental_scan: true
+  # 缓存清理间隔（天数，定期清理不存在的文件记录）
+  cache_cleanup_interval: 30
+  # 启用GUI模式（需要tkinter支持）
+  enable_gui: false
+
+################################
 other:
   # 是否在stdin/stdout进行交互
   interactive: true
