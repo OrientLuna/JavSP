@@ -46,7 +46,7 @@ from javsp.web.base import download
 from javsp.web.exceptions import *
 from javsp.web.translate import translate_movie_info
 
-from javsp.config import Cfg, CrawlerID
+from javsp.config import Cfg, CrawlerID, OperationMode
 from javsp.prompt import prompt
 
 actressAliasMap = {}
@@ -163,8 +163,22 @@ def info_summary(movie: Movie, all_info: Dict[str, MovieInfo]):
     """汇总多个来源的在线数据生成最终数据"""
     final_info = MovieInfo(movie)
     ########## 部分字段配置了专门的选取逻辑，先处理这些字段 ##########
-    # genre
-    if 'javdb' in all_info and all_info['javdb'].genre:
+    # genre - 优先使用标准化的类型
+    norm_genres = []
+    for name, data in all_info.items():
+        if hasattr(data, 'genre_norm') and data.genre_norm:
+            norm_genres.extend(data.genre_norm)
+
+    if norm_genres:
+        # 去重并保持顺序
+        seen = set()
+        final_info.genre = []
+        for genre in norm_genres:
+            if genre not in seen:
+                final_info.genre.append(genre)
+                seen.add(genre)
+    elif 'javdb' in all_info and all_info['javdb'].genre:
+        # 回退到javdb的原始类型
         final_info.genre = all_info['javdb'].genre
 
     ########## 移除所有抓取器数据中，标题尾部的女优名 ##########
@@ -400,6 +414,108 @@ def reviewMovieID(all_movies, root):
 SUBTITLE_MARK_FILE = Image.open(os.path.abspath(resource_path('image/sub_mark.png')))
 UNCENSORED_MARK_FILE = Image.open(os.path.abspath(resource_path('image/unc_mark.png')))
 
+def RunScrapeOnlyMode(all_movies):
+    """仅抓取数据模式"""
+    def check_step(result, msg='步骤错误'):
+        if result:
+            inner_bar.update()
+        else:
+            raise Exception(msg + '\n')
+
+    outer_bar = tqdm(all_movies, desc='抓取数据', ascii=True, leave=False)
+    total_step = 4
+    if Cfg().translator.engine:
+        total_step += 1
+
+    return_movies = []
+    for movie in outer_bar:
+        try:
+            filenames = [os.path.split(i)[1] for i in movie.files]
+            logger.info('正在抓取: ' + ', '.join(filenames))
+            inner_bar = tqdm(total=total_step, desc='步骤', ascii=True, leave=False)
+
+            # 执行爬取步骤
+            inner_bar.set_description(f'启动并发任务')
+            all_info = parallel_crawler(movie, inner_bar)
+            msg = f'为其配置的{len(Cfg().crawler.selection[movie.data_src])}个抓取器均未获取到影片信息'
+            check_step(all_info, msg)
+
+            inner_bar.set_description('汇总数据')
+            has_required_keys = info_summary(movie, all_info)
+            check_step(has_required_keys)
+
+            if Cfg().translator.engine:
+                inner_bar.set_description('翻译影片信息')
+                success = translate_movie_info(movie.info)
+                check_step(success)
+
+            # 生成文件名但不移动文件
+            generate_names(movie)
+            check_step(movie.save_dir, '无法按命名规则生成目标文件夹')
+
+            # 创建NFO文件到当前目录
+            movie.nfo_file = os.path.join(os.path.dirname(movie.files[0]), movie.basename + '.nfo')
+            inner_bar.set_description('写入NFO')
+            write_nfo(movie.info, movie.nfo_file)
+            check_step(True)
+
+            logger.info(f'抓取完成，NFO文件已保存到: {movie.nfo_file}\n')
+            return_movies.append(movie)
+        except Exception as e:
+            logger.exception(f'抓取失败: {e}')
+        finally:
+            inner_bar.close()
+    return return_movies
+
+
+def RunOrganizeOnlyMode(all_movies):
+    """仅整理文件模式"""
+    def check_step(result, msg='步骤错误'):
+        if result:
+            inner_bar.update()
+        else:
+            raise Exception(msg + '\n')
+
+    outer_bar = tqdm(all_movies, desc='整理文件', ascii=True, leave=False)
+    total_step = 3
+
+    return_movies = []
+    for movie in outer_bar:
+        try:
+            filenames = [os.path.split(i)[1] for i in movie.files]
+            logger.info('正在整理: ' + ', '.join(filenames))
+            inner_bar = tqdm(total=total_step, desc='步骤', ascii=True, leave=False)
+
+            # 检查是否有电影信息，如果没有则创建基本信息
+            if not hasattr(movie, 'info') or not movie.info:
+                movie.info = MovieInfo(movie)
+                # 设置基本信息
+                movie.info.title = movie.dvdid if movie.dvdid else movie.cid
+                movie.info.actress = [Cfg().summarizer.default.actress]
+
+            # 生成文件名和目录
+            generate_names(movie)
+            check_step(movie.save_dir, '无法按命名规则生成目标文件夹')
+            if not os.path.exists(movie.save_dir):
+                os.makedirs(movie.save_dir)
+
+            # 移动文件
+            if Cfg().summarizer.move_files:
+                inner_bar.set_description('移动影片文件')
+                movie.rename_files()
+                check_step(True)
+                logger.info(f'整理完成，相关文件已保存到: {movie.save_dir}\n')
+            else:
+                logger.info(f'文件未移动，保持原位置\n')
+
+            return_movies.append(movie)
+        except Exception as e:
+            logger.exception(f'整理失败: {e}')
+        finally:
+            inner_bar.close()
+    return return_movies
+
+
 def process_poster(movie: Movie):
     def should_use_ai_crop_match(label):
         for r in Cfg().summarizer.cover.crop.on_id_pattern:
@@ -632,7 +748,15 @@ def entry():
     logger.info(f'扫描影片文件：共找到 {movie_count} 部影片')
     if Cfg().scanner.manual:
         reviewMovieID(recognized, root)
-    RunNormalMode(recognized + recognize_fail)
+
+    # 根据运行模式选择处理流程
+    operation_mode = Cfg().summarizer.operation_mode
+    if operation_mode == OperationMode.SCRAPE_ONLY:
+        RunScrapeOnlyMode(recognized + recognize_fail)
+    elif operation_mode == OperationMode.ORGANIZE_ONLY:
+        RunOrganizeOnlyMode(recognized + recognize_fail)
+    else:
+        RunNormalMode(recognized + recognize_fail)
 
     sys.exit(0)
 

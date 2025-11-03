@@ -111,6 +111,11 @@ class FileMoveMode(str, Enum):
     HARD_LINK = "hard_link"
     SOFT_LINK = "soft_link"
 
+class OperationMode(str, Enum):
+    SCRAPE_AND_ORGANIZE = "scrape_and_organize"
+    SCRAPE_ONLY = "scrape_only"
+    ORGANIZE_ONLY = "organize_only"
+
 class Crawler(BaseConfig):
     selection: CrawlerSelect
     required_keys: list[MovieInfoField]
@@ -172,6 +177,7 @@ class Summarizer(BaseConfig):
     default: MovieDefault
     censor_options_representation: list[str]
     title: TitleSummarize
+    operation_mode: OperationMode = OperationMode.SCRAPE_AND_ORGANIZE
     move_files: bool = True
     path: PathSummarize
     nfo: NFOSummarize

@@ -1,4 +1,6 @@
 import os
+import sys
+import platform
 from typing import List, Tuple
 from cx_Freeze import setup, Executable
 
@@ -25,19 +27,59 @@ packages = [
     'pendulum' # pydantic_extra_types depends on pendulum
 ]
 
-build_exe = {
-    'include_files': include_files,
-    'includes': includes,
-    'excludes': ['unittest'],
-    'packages': packages,
-}
+# 平台特定的构建配置
+if platform.system() == 'Darwin':  # macOS
+    build_exe = {
+        'include_files': include_files,
+        'includes': includes,
+        'excludes': ['unittest', 'test'],
+        'packages': packages,
+        'zip_include_packages': ['*'],
+        'zip_exclude_packages': [],
+        'include_msvcr': True,
+        'silent': True,
+    }
+elif platform.system() == 'Windows':
+    build_exe = {
+        'include_files': include_files,
+        'includes': includes,
+        'excludes': ['unittest'],
+        'packages': packages,
+        'include_msvcr': True,
+    }
+else:  # Linux
+    build_exe = {
+        'include_files': include_files,
+        'includes': includes,
+        'excludes': ['unittest'],
+        'packages': packages,
+    }
 
-javsp = Executable(
-    './javsp/__main__.py', 
-    target_name='JavSP', 
-    base=base,
-    icon='./image/JavSP.ico',
-)
+# 根据平台选择可执行文件配置
+if platform.system() == 'Darwin':  # macOS
+    # macOS 命令行可执行文件
+    javsp = Executable(
+        './javsp/__main__.py',
+        target_name='javsp',  # 使用小写以符合命令行惯例
+        base=None,  # 不使用控制台基础，保持为普通命令行程序
+        icon=None,  # macOS 不使用 .ico 格式
+    )
+elif platform.system() == 'Windows':
+    # Windows 可执行文件
+    javsp = Executable(
+        './javsp/__main__.py',
+        target_name='JavSP',
+        base=None,
+        icon='./image/JavSP.ico',
+    )
+else:  # Linux
+    # Linux 可执行文件
+    javsp = Executable(
+        './javsp/__main__.py',
+        target_name='javsp',
+        base=None,
+        icon=None,
+    )
 
 setup(
     name='JavSP',

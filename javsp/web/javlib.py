@@ -7,13 +7,14 @@ from javsp.web.base import Request, read_proxy, resp2html
 from javsp.web.exceptions import *
 from javsp.web.proxyfree import get_proxy_free_url
 from javsp.config import Cfg, CrawlerID
-from javsp.datatype import  MovieInfo
+from javsp.datatype import  MovieInfo, GenreMap
 
 
 # 初始化Request实例
 request = Request(use_scraper=True)
 
 logger = logging.getLogger(__name__)
+genre_map = GenreMap('data/genre_javlib.csv')
 permanent_url = 'https://www.javlibrary.com'
 base_url = ''
 
@@ -126,6 +127,7 @@ def parse_data(movie: MovieInfo):
     movie.duration = duration
     movie.producer = producer
     movie.genre = genre
+    movie.genre_norm = genre_map.map(genre)
     movie.actress = actress
 
 

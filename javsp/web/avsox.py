@@ -4,10 +4,11 @@ import logging
 from javsp.web.base import get_html
 from javsp.web.exceptions import *
 from javsp.config import Cfg, CrawlerID
-from javsp.datatype import MovieInfo
+from javsp.datatype import MovieInfo, GenreMap
 
 
 logger = logging.getLogger(__name__)
+genre_map = GenreMap('data/genre_avsox.csv')
 base_url = str(Cfg().network.proxy_free[CrawlerID.avsox])
 
 
@@ -53,6 +54,7 @@ def parse_data(movie: MovieInfo):
     movie.publish_date = publish_date
     movie.duration = duration
     movie.genre = genre
+    movie.genre_norm = genre_map.map(genre)
     movie.actress = actress
     if full_id.startswith('FC2-'):
         # avsox把FC2作品的拍摄者归类到'系列'而制作商固定为'FC2-PPV'，这既不合理也与其他的站点不兼容，因此进行调整
