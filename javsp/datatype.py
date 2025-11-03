@@ -4,9 +4,10 @@ import csv
 import json
 import shutil
 import logging
+import platform
 from functools import cached_property
 
-from javsp.config import Cfg
+from javsp.config import Cfg, FileMoveMode
 from javsp.lib import resource_path, detect_special_attr
 
 
@@ -167,18 +168,52 @@ class Movie:
             expression = f"('{self.dvdid}')"
         return __class__.__name__ + expression
 
-    def rename_files(self, use_hardlink: bool = False) -> None:
+    def rename_files(self, move_mode: FileMoveMode = None) -> None:
         """根据命名规则移动（重命名）影片文件"""
+        if move_mode is None:
+            move_mode = Cfg().summarizer.path.move_mode
+
+        def make_link(src, dst, link_type):
+            """创建链接的辅助函数"""
+            if Cfg().summarizer.path.use_absolute_paths:
+                src = os.path.abspath(src)
+                dst = os.path.abspath(dst)
+
+            if link_type == FileMoveMode.HARD_LINK:
+                os.link(src, dst)
+            elif link_type == FileMoveMode.SOFT_LINK:
+                if platform.system() == 'Windows':
+                    import ctypes
+                    if not ctypes.windll.shell32.IsUserAnAdmin():
+                        raise PermissionError("Creating symbolic links requires administrator privileges on Windows")
+                os.symlink(src, dst)
+
         def move_file(src:str, dst:str):
             """移动（重命名）文件并记录信息到日志"""
             abs_dst = os.path.abspath(dst)
             # shutil.move might overwrite dst file
             if os.path.exists(abs_dst):
                 raise FileExistsError(f'File exists: {abs_dst}')
-            if (use_hardlink):
-                os.link(src, abs_dst)
-            else:
-                shutil.move(src, abs_dst)
+
+            success = False
+            original_mode = move_mode
+
+            while not success:
+                try:
+                    if original_mode == FileMoveMode.MOVE:
+                        shutil.move(src, abs_dst)
+                    elif original_mode == FileMoveMode.HARD_LINK:
+                        make_link(src, abs_dst, FileMoveMode.HARD_LINK)
+                    elif original_mode == FileMoveMode.SOFT_LINK:
+                        make_link(src, abs_dst, FileMoveMode.SOFT_LINK)
+                    success = True
+                except (OSError, PermissionError) as e:
+                    if original_mode != Cfg().summarizer.path.link_failure_strategy:
+                        logger.debug(f"{original_mode.value} failed: {e}, trying {Cfg().summarizer.path.link_failure_strategy.value}")
+                        original_mode = Cfg().summarizer.path.link_failure_strategy
+                    else:
+                        raise e
+
             src_rel = os.path.relpath(src)
             dst_name = os.path.basename(dst)
             logger.info(f"重命名文件: '{src_rel}' -> '...{os.sep}{dst_name}'")

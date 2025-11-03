@@ -43,6 +43,20 @@
 
 ## [安装并运行JavSP](https://github.com/Yuukiy/JavSP/wiki/%E5%AE%89%E8%A3%85%E5%B9%B6%E8%BF%90%E8%A1%8CJavSP)
 
+### 使用 Poetry (推荐)
+
+```bash
+# 克隆项目
+git clone https://github.com/Yuukiy/JavSP.git
+cd JavSP
+
+# 安装依赖
+poetry install
+
+# 运行程序
+poetry run javsp
+```
+
 ## 使用
 
 软件开箱即用。如果想让软件更符合你的使用需求，也许你需要更改配置文件:

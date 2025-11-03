@@ -106,6 +106,11 @@ class UseJavDBCover(str, Enum):
     no = "no"
     fallback = "fallback"
 
+class FileMoveMode(str, Enum):
+    MOVE = "move"
+    HARD_LINK = "hard_link"
+    SOFT_LINK = "soft_link"
+
 class Crawler(BaseConfig):
     selection: CrawlerSelect
     required_keys: list[MovieInfoField]
@@ -130,7 +135,9 @@ class PathSummarize(BaseConfig):
     length_maximum: PositiveInt
     length_by_byte: bool
     max_actress_count: PositiveInt = 10
-    hard_link: bool
+    move_mode: FileMoveMode
+    link_failure_strategy: FileMoveMode
+    use_absolute_paths: bool
 
 class TitleSummarize(BaseConfig):
     remove_trailing_actor_name: bool

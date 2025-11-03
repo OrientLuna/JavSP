@@ -3,6 +3,7 @@ import re
 import sys
 import json
 import time
+import shutil
 import logging
 from PIL import Image
 from pydantic import ValidationError
@@ -482,6 +483,20 @@ def RunNormalMode(all_movies):
 
             process_poster(movie)
 
+            # 处理字幕文件
+            movie_id = movie.dvdid if movie.dvdid else movie.cid
+            if movie_id:
+                subtitle_file = find_subtitle_in_dir(os.path.dirname(movie.files[0]), movie_id)
+                if subtitle_file:
+                    _, ext = os.path.splitext(subtitle_file)
+                    subtitle_dest = os.path.join(movie.save_dir, movie.basename + ext)
+                    if Cfg().summarizer.move_files:
+                        movie.rename_files()
+                        shutil.move(subtitle_file, subtitle_dest)
+                    else:
+                        shutil.copy2(subtitle_file, subtitle_dest)
+                    setattr(movie.info, 'subtitle', os.path.basename(subtitle_dest))
+
             check_step(True)
 
             if Cfg().summarizer.extra_fanarts.enabled:
@@ -514,7 +529,7 @@ def RunNormalMode(all_movies):
             check_step(True)
             if Cfg().summarizer.move_files:
                 inner_bar.set_description('移动影片文件')
-                movie.rename_files(Cfg().summarizer.path.hard_link)
+                movie.rename_files()
                 check_step(True)
                 logger.info(f'整理完成，相关文件已保存到: {movie.save_dir}\n')
             else:

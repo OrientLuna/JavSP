@@ -99,7 +99,9 @@ def write_nfo(info: MovieInfo, nfo_file):
     if info.preview_video:
         nfo.append(E.trailer(info.preview_video))
 
-    # TODO: fileinfo 字段，看起来可以给定字幕语言和类型，留待开发
+    # 字幕文件信息
+    if hasattr(info, 'subtitle') and info.subtitle:
+        nfo.append(E.subtitle(E.lang(f'zh'), info.subtitle))
 
     # 写入演员名。Kodi支持用thumb显示演员头像，如果能获取到演员头像也一并写入
     if info.actress:
