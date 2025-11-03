@@ -227,7 +227,8 @@ class General(BaseConfig):
     cache_file: str = "data/scan_cache.json"
     enable_incremental_scan: bool = True
     cache_cleanup_interval: int = 30  # days
-    enable_gui: bool = False  # 是否启用GUI模式
+    enable_webui: bool = False  # 是否启用WebUI模式
+    webui_port: int = 5000  # WebUI端口
 
 class Other(BaseConfig):
     interactive: bool

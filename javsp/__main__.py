@@ -740,17 +740,17 @@ def entry():
     try:
         cfg = Cfg()
 
-        # 检查是否启用GUI模式
-        if hasattr(cfg, 'general') and hasattr(cfg.general, 'enable_gui') and cfg.general.enable_gui:
+        # 检查是否启用WebUI模式
+        if hasattr(cfg, 'general') and hasattr(cfg.general, 'enable_webui') and cfg.general.enable_webui:
             try:
-                from javsp.gui.app import JavSPApp
-                app = JavSPApp()
-                app.run()
+                from javsp.webui.app import create_app
+                app = create_app()
+                app.run(host='0.0.0.0', port=cfg.general.webui_port, debug=False)
                 return
             except ImportError as e:
-                print(f"GUI模块不可用，回退到命令行模式: {e}")
+                print(f"WebUI模块不可用，回退到命令行模式: {e}")
             except Exception as e:
-                print(f"启动GUI失败，回退到命令行模式: {e}")
+                print(f"启动WebUI失败，回退到命令行模式: {e}")
 
     except ValidationError as e:
         print(e.errors())

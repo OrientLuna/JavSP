@@ -202,8 +202,10 @@ general:
   enable_incremental_scan: true
   # 缓存清理间隔（天数，定期清理不存在的文件记录）
   cache_cleanup_interval: 30
-  # 启用GUI模式（需要tkinter支持）
-  enable_gui: false
+  # 启用WebUI模式（浏览器访问）
+  enable_webui: true
+  # WebUI服务端口
+  webui_port: 5000
 
 ################################
 other:

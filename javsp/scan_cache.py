@@ -265,7 +265,7 @@ def get_cache() -> ScanCache:
     global _global_cache
     if _global_cache is None:
         from javsp.config import Cfg
-        cache_file = Cfg().general.get('cache_file', 'data/scan_cache.json')
+        cache_file = Cfg().general.cache_file
         _global_cache = ScanCache(cache_file)
     return _global_cache
 
