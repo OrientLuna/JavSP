@@ -10,13 +10,14 @@ from sys import platform
 from typing import List
 
 
-__all__ = ['scan_movies', 'get_fmt_size', 'get_remaining_path_len', 'replace_illegal_chars', 'get_failed_when_scan', 'find_subtitle_in_dir']
+__all__ = ['scan_movies', 'filter_unprocessed_movies', 'get_fmt_size', 'get_remaining_path_len', 'replace_illegal_chars', 'get_failed_when_scan', 'find_subtitle_in_dir']
 
 
 from javsp.avid import *
 from javsp.lib import re_escape
 from javsp.config import Cfg
 from javsp.datatype import Movie
+from javsp.tracking import get_tracker
 
 logger = logging.getLogger(__name__)
 failed_items = []
@@ -246,6 +247,53 @@ def find_subtitle_in_dir(folder: str, dvdid: str):
         _sub_files[folder] = folder_data
     sub_file = folder_data.get(dvdid.upper())
     return sub_file
+
+
+def filter_unprocessed_movies(movies: List[Movie]) -> List[Movie]:
+    """过滤已处理的电影，返回需要处理的未处理电影列表
+
+    Args:
+        movies: 扫描到的所有电影列表
+
+    Returns:
+        过滤后的未处理电影列表
+    """
+    # 检查是否启用增量刮削
+    if not hasattr(Cfg().scanner, 'incremental') or not Cfg().scanner.incremental:
+        # 如果没有启用增量刮削，直接返回所有电影（默认行为：刮削全部）
+        logger.debug("未启用增量刮削，将处理所有电影")
+        return movies
+
+    tracker = get_tracker()
+    unprocessed_movies = []
+    skipped_count = 0
+
+    # 如果跟踪器中没有已处理的记录，则返回所有电影
+    if not tracker.processed_movies:
+        logger.debug("跟踪文件为空，将处理所有电影")
+        return movies
+
+    for movie in movies:
+        # 获取电影的番号
+        movie_id = movie.dvdid if movie.dvdid else movie.cid
+        if not movie_id:
+            # 如果没有番号，仍然需要处理
+            unprocessed_movies.append(movie)
+            continue
+
+        # 检查是否已处理
+        if tracker.is_movie_processed(movie_id, movie.files):
+            skipped_count += 1
+            logger.debug(f"跳过已处理的电影: {movie_id}")
+            continue
+
+        # 未处理的电影加入处理列表
+        unprocessed_movies.append(movie)
+
+    if skipped_count > 0:
+        logger.info(f"增量刮削模式：跳过了 {skipped_count} 个已处理的电影")
+
+    return unprocessed_movies
 
 
 if __name__ == "__main__":

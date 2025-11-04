@@ -9,6 +9,7 @@ from functools import cached_property
 
 from javsp.config import Cfg, FileMoveMode
 from javsp.lib import resource_path, detect_special_attr
+from javsp.duplicate import move_file_with_duplicate_check
 
 
 logger = logging.getLogger(__name__)
@@ -191,34 +192,25 @@ class Movie:
         def move_file(src:str, dst:str):
             """移动（重命名）文件并记录信息到日志"""
             abs_dst = os.path.abspath(dst)
-            # shutil.move might overwrite dst file
-            if os.path.exists(abs_dst):
-                raise FileExistsError(f'File exists: {abs_dst}')
 
-            success = False
-            original_mode = move_mode
+            # 使用重复文件处理逻辑
+            final_dst = move_file_with_duplicate_check(src, abs_dst, move_mode)
+            if final_dst is None:
+                # 文件被跳过
+                logger.info(f"跳过重复文件: '{os.path.basename(src)}'")
+                return False
 
-            while not success:
-                try:
-                    if original_mode == FileMoveMode.MOVE:
-                        shutil.move(src, abs_dst)
-                    elif original_mode == FileMoveMode.HARD_LINK:
-                        make_link(src, abs_dst, FileMoveMode.HARD_LINK)
-                    elif original_mode == FileMoveMode.SOFT_LINK:
-                        make_link(src, abs_dst, FileMoveMode.SOFT_LINK)
-                    success = True
-                except (OSError, PermissionError) as e:
-                    if original_mode != Cfg().summarizer.path.link_failure_strategy:
-                        logger.debug(f"{original_mode.value} failed: {e}, trying {Cfg().summarizer.path.link_failure_strategy.value}")
-                        original_mode = Cfg().summarizer.path.link_failure_strategy
-                    else:
-                        raise e
+            # 更新实际使用的目标路径
+            if final_dst != abs_dst:
+                dst = final_dst
+                abs_dst = final_dst
 
             src_rel = os.path.relpath(src)
             dst_name = os.path.basename(dst)
             logger.info(f"重命名文件: '{src_rel}' -> '...{os.sep}{dst_name}'")
             # 目前StreamHandler并未设置filter，为了避免显示中出现重复的日志，这里暂时只能用debug级别
             filemove_logger.debug(f'移动（重命名）文件: \n  原路径: "{src}"\n  新路径: "{abs_dst}"')
+            return True
 
         new_paths = []
         dir = os.path.dirname(self.files[0])
@@ -226,14 +218,14 @@ class Movie:
             fullpath = self.files[0]
             ext = os.path.splitext(fullpath)[1]
             newpath = os.path.join(self.save_dir, self.basename + ext)
-            move_file(fullpath, newpath)
-            new_paths.append(newpath)
+            if move_file(fullpath, newpath):
+                new_paths.append(newpath)
         else:
             for i, fullpath in enumerate(self.files, start=1):
                 ext = os.path.splitext(fullpath)[1]
                 newpath = os.path.join(self.save_dir, self.basename + f'-CD{i}' + ext)
-                move_file(fullpath, newpath)
-                new_paths.append(newpath)
+                if move_file(fullpath, newpath):
+                    new_paths.append(newpath)
         self.new_paths = new_paths
         if len(os.listdir(dir)) == 0:
             #如果移动文件后目录为空则删除该目录

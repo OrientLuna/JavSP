@@ -39,6 +39,7 @@ logger = logging.getLogger('main')
 from javsp.lib import resource_path
 from javsp.nfo import write_nfo
 from javsp.file import *
+from javsp.tracking import get_tracker, reset_tracker
 from javsp.func import *
 from javsp.image import *
 from javsp.datatype import Movie, MovieInfo
@@ -461,6 +462,15 @@ def RunScrapeOnlyMode(all_movies):
 
             logger.info(f'抓取完成，NFO文件已保存到: {movie.nfo_file}\n')
             return_movies.append(movie)
+
+            # 增量刮削：标记电影为已处理
+            if hasattr(Cfg().scanner, 'incremental') and Cfg().scanner.incremental:
+                tracker = get_tracker()
+                movie_id = movie.dvdid if movie.dvdid else movie.cid
+                if movie_id:
+                    target_files = [movie.nfo_file]
+                    tracker.mark_movie_processed(movie_id, movie.data_src, movie.files, target_files)
+                    logger.debug(f'增量刮削：已标记电影 {movie_id} 为处理完成')
         except Exception as e:
             logger.exception(f'抓取失败: {e}')
         finally:
@@ -509,6 +519,23 @@ def RunOrganizeOnlyMode(all_movies):
                 logger.info(f'文件未移动，保持原位置\n')
 
             return_movies.append(movie)
+
+            # 增量刮削：标记电影为已处理
+            if hasattr(Cfg().scanner, 'incremental') and Cfg().scanner.incremental:
+                tracker = get_tracker()
+                movie_id = movie.dvdid if movie.dvdid else movie.cid
+                if movie_id:
+                    target_files = []
+                    # 收集所有目标文件
+                    if hasattr(movie, 'nfo_file') and movie.nfo_file and os.path.exists(movie.nfo_file):
+                        target_files.append(movie.nfo_file)
+                    if hasattr(movie, 'poster_file') and movie.poster_file and os.path.exists(movie.poster_file):
+                        target_files.append(movie.poster_file)
+                    if hasattr(movie, 'fanart_file') and movie.fanart_file and os.path.exists(movie.fanart_file):
+                        target_files.append(movie.fanart_file)
+
+                    tracker.mark_movie_processed(movie_id, movie.data_src, movie.files, target_files)
+                    logger.debug(f'增量刮削：已标记电影 {movie_id} 为处理完成')
         except Exception as e:
             logger.exception(f'整理失败: {e}')
         finally:
@@ -654,6 +681,23 @@ def RunNormalMode(all_movies):
             if movie != all_movies[-1] and Cfg().crawler.sleep_after_scraping > Duration(0):
                 time.sleep(Cfg().crawler.sleep_after_scraping.total_seconds())
             return_movies.append(movie)
+
+            # 增量刮削：标记电影为已处理
+            if hasattr(Cfg().scanner, 'incremental') and Cfg().scanner.incremental:
+                tracker = get_tracker()
+                movie_id = movie.dvdid if movie.dvdid else movie.cid
+                if movie_id:
+                    target_files = []
+                    # 收集所有目标文件
+                    if hasattr(movie, 'nfo_file') and movie.nfo_file and os.path.exists(movie.nfo_file):
+                        target_files.append(movie.nfo_file)
+                    if hasattr(movie, 'poster_file') and movie.poster_file and os.path.exists(movie.poster_file):
+                        target_files.append(movie.poster_file)
+                    if hasattr(movie, 'fanart_file') and movie.fanart_file and os.path.exists(movie.fanart_file):
+                        target_files.append(movie.fanart_file)
+
+                    tracker.mark_movie_processed(movie_id, movie.data_src, movie.files, target_files)
+                    logger.debug(f'增量刮削：已标记电影 {movie_id} 为处理完成')
         # except Exception as e:
         #     logger.debug(e, exc_info=True)
         #     logger.error(f'整理失败: {e}')
@@ -748,6 +792,22 @@ def entry():
     logger.info(f'扫描影片文件：共找到 {movie_count} 部影片')
     if Cfg().scanner.manual:
         reviewMovieID(recognized, root)
+
+    # 增量刮削：过滤已处理的电影
+    if hasattr(Cfg().scanner, 'incremental') and Cfg().scanner.incremental:
+        logger.info('启用增量刮削模式，正在检查已处理的影片...')
+        tracker = get_tracker()
+        # 清理目标文件不存在的记录
+        tracker.cleanup_missing_targets()
+        # 过滤已处理的电影
+        unprocessed_count = len(recognized)
+        recognized = filter_unprocessed_movies(recognized)
+        skipped_count = unprocessed_count - len(recognized)
+        if skipped_count > 0:
+            logger.info(f'增量刮削：跳过了 {skipped_count} 个已处理的影片，剩余 {len(recognized)} 个待处理')
+    else:
+        # 如果不启用增量刮削，重置跟踪器避免误判
+        reset_tracker()
 
     # 根据运行模式选择处理流程
     operation_mode = Cfg().summarizer.operation_mode

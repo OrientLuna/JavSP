@@ -17,6 +17,12 @@ class Scanner(BaseConfig):
     minimum_size: ByteSize
     skip_nfo_dir: bool
     manual: bool
+    # 增量刮削选项
+    incremental: bool = False
+    tracking_file: str = ".javsp_processed.json"
+    skip_existing: bool = True
+    update_modified: bool = False
+    duplicate_strategy: str = "ask"
 
 class CrawlerID(str, Enum):
     airav = 'airav'

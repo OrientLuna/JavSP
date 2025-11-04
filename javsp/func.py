@@ -173,7 +173,11 @@ def check_update(allow_check=True, auto_update=True):
         print('')
 
     # 使用pyinstaller打包exe时生成hook，运行时由该hook将版本信息注入到sys中
-    local_version = meta.version('javsp')
+    try:
+        local_version = meta.version('javsp')
+    except Exception:
+        # 如果无法获取版本信息，跳过更新检查
+        local_version = ""
     if local_version == "":
         return
     # 检查更新

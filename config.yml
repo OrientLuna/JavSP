@@ -11,7 +11,7 @@ scanner:
     - 'Carib(beancom)?'
     - '[^a-z\d](f?hd|lt)[^a-z\d]'
   # 整理哪个文件夹下的影片？（此项留空时将在运行时询问）
-  input_directory: '/tmp/javsp_test'
+  input_directory: '/Users/chen/Downloads'
   # 哪些后缀的文件应当视为影片？
   filename_extensions: [.3gp, .avi, .f4v, .flv, .iso, .m2ts, .m4v, .mkv, .mov, .mp4, .mpeg, .rm, .rmvb, .ts, .vob, .webm, .wmv, .strm, .mpg]
   # 扫描影片文件时忽略指定的文件夹
@@ -21,11 +21,23 @@ scanner:
   minimum_size: 50MiB
   skip_nfo_dir: yes
   manual: false
+
+  # 增量刮削选项
+  # 启用增量刮削模式，避免重复处理已刮削的文件
+  incremental: true
+  # 跟踪文件的名称（如果路径是相对路径，则相对于输入目录）
+  tracking_file: ".javsp_processed.json"
+  # 跳过已存在的目标文件（如果启用，不会检查源文件是否有变更）
+  skip_existing: true
+  # 更新已修改的文件（如果源文件的大小或修改时间有变化，则重新处理）
+  update_modified: false
+  # 重复文件处理策略: skip(跳过)/replace(替换)/ask(询问)/rename(重命名)
+  duplicate_strategy: ask
 ################################
 network:
   # 设置代理服务器地址，支持 http, socks5/socks5h 代理，比如'http://127.0.0.1:1080'
   # null表示禁用代理
-  proxy_server: 'http://10.0.0.161:10809'
+  proxy_server: 'http://localhost:7897'
   # 各个站点的免代理地址。地址失效时软件会自动尝试获取新地址，你也可以手动设置
   proxy_free:
     avsox: 'https://avsox.click'
@@ -42,8 +54,8 @@ crawler:
   # 要使用的爬虫列表（汇总数据时从前到后进行）
   # airav avsox avwiki fanza fc2 fc2fan javbus javdb javlib javmenu jav321 mgstage prestige arzon arzon_iv
   selection:
-    normal: [airav, avsox, javbus, javdb, javlib, jav321, mgstage, prestige]
-    fc2: [fc2, avsox, javdb, javmenu, fc2ppvdb]
+    normal: [airav, avsox, javbus, javlib, jav321]
+    fc2: [fc2, avsox, javmenu]
     cid: [fanza]
     getchu: [dl_getchu]
     gyutto: [gyutto]
@@ -76,7 +88,7 @@ summarizer:
   # 路径相关的选项
   path: 
     # 存放影片、封面等文件的文件夹路径
-    output_folder_pattern: '#整理完成/{actress}/[{num}] {title}'
+    output_folder_pattern: '/Users/chen/tmp/{actress}/[{num}] {title}'
     # 影片、封面、nfo信息文件等的文件名将基于下面的规则来创建
     basename_pattern: '{num}'
     # 允许的最长文件路径（路径过长时将据此自动截短标题）
@@ -199,6 +211,6 @@ other:
   # 是否在stdin/stdout进行交互
   interactive: true
   # 是否允许检查更新。如果允许，在有新版本时会显示提示信息和新版功能
-  check_update: true
+  check_update: false
   # 是否允许检查到新版本时自动下载
   auto_update: false
